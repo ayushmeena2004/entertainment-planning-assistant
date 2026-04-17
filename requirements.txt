@@ -3,3 +3,5 @@ langchain-community
 streamlit
 python-dotenv
 pydantic
+langchain-groq
+litellm
