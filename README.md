@@ -1,24 +1,46 @@
-# 🎬 AI Entertainment Planning Assistant
 
-An autonomous multi-agent system built with **CrewAI**, **Streamlit**, and **Groq (Llama 3.3)**. This assistant helps users discover trending media, find direct access links, and generate minute-by-minute entertainment itineraries.
+# 🎬 Entertainment Planning Assistant (AI Powered)
+
+An intelligent AI-based entertainment recommendation and planning system built using **CrewAI** and **Streamlit**. This assistant suggests movies, games, and trending content while creating a personalized schedule for users.
 
 ## 🚀 Features
-- **Multi-Agent Collaboration**: Uses three specialized agents (Scout, Logistics, and Planner) to handle complex requests.
-- **Deep-Link Engine**: Automatically searches for direct streaming and ticket links (BookMyShow, Netflix, Steam).
-- **Persistent Memory**: Remembers previous context (like your city or chosen genre) throughout the chat.
-- **Automated Scheduling**: Generates clean Markdown tables for time-based planning.
+*   🎯 **Smart recommendations** (Movies / Games / Trending)
+*   🔍 **Real-time data fetching** using external APIs
+*   🤖 **Multi-agent system** using CrewAI:
+    *   **Scout Agent** → Finds the best content.
+    *   **Logistics Agent** → Fetches valid links.
+    *   **Planner Agent** → Creates a structured plan.
+*   📅 **Auto-generated** entertainment schedules.
+*   🔗 **Direct watch/play links**.
+*   💬 **Chat-based UI** using Streamlit.
+*   🧠 **Context-aware** responses.
 
-## 🛠️ Tech Stack
-- **Framework**: [CrewAI](https://crewai.com)
-- **LLM**: Groq (Llama-3.3-70b-versatile)
-- **UI**: Streamlit
-- **Search**: DuckDuckGo Search API
+## 🏗️ Tech Stack
+*   **Frontend:** Streamlit
+*   **Backend / AI Orchestration:** CrewAI
+*   **LLM Provider:** Groq
+*   **APIs Used:**
+    *   🎬 OMDb API (Movies)
+    *   🎮 RAWG API (Games)
+    *   🌐 Tavily API (Web search)
 
-## 📋 Prerequisites
-- Python 3.10 - 3.12
-- A Groq API Key (Get it at [console.groq.com](https://console.groq.com))
+## 🧠 How It Works
+1.  User enters a query (e.g., “Horror movies for 2 hours”).
+2.  **CrewAI agents collaborate:**
+    *   **Scout** finds the best recommendations.
+    *   **Logistics** fetches valid links.
+    *   **Planner** structures the final output.
+3.  **Streamlit UI displays:**
+    *   🎬 Recommendations
+    *   🔗 Links
+    *   📅 Detailed Schedule
 
-## ⚙️ Setup Instructions
-
-
-
+## 📂 Project Structure
+```text
+Entertainment-Assistant/
+│
+├── app.py              # Streamlit UI
+├── agents.py           # CrewAI agents + tools
+├── requirements.txt    # Dependencies
+├── .env                # API keys (not included)
+└── README.md           # Documentation

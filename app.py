@@ -1,125 +1,108 @@
 import streamlit as st
 import os
+import json
+import ast  # ✅ Added for bulletproof parsing of Python-style dictionaries
 from crewai import Crew, Process, Task
 from agents import get_crew_agents
 from dotenv import load_dotenv
+from pydantic import BaseModel
+from typing import List
 
-# 1. Setup & Environment
+# ------------------ SETUP ------------------ #
 load_dotenv()
+
+# Define the structured output schema
+class TimelineItem(BaseModel):
+    time: str
+    event: str
+    details: str
+
+class Recommendation(BaseModel):
+    title: str
+    description: str
+    why: str
+
+class Link(BaseModel):
+    title: str
+    url: str
+
+class PlanOutput(BaseModel):
+    timeline: List[TimelineItem]
+    recommendations: List[Recommendation]
+    links: List[Link]
+
 st.set_page_config(page_title="Entertainment AI", page_icon="🎬", layout="wide")
 
-# 2. Memory Initialization
+# ------------------ MEMORY ------------------ #
 if "history" not in st.session_state:
     st.session_state.history = []
 
-# 3. Sidebar (Left Corner)
+# ------------------ SIDEBAR ------------------ #
 with st.sidebar:
     st.title("⚙️ Controls")
     if st.button("🗑️ Clear Chat / New Plan", use_container_width=True):
         st.session_state.history = []
         st.rerun()
-    st.info("I remember our conversation! Ask me to 'plan' the choices we just discussed.")
+    st.info("Ask normally → then say 'plan it' to generate schedule")
 
+# ------------------ TITLE ------------------ #
 st.title("🎬 Entertainment Planning Assistant")
 
-# 4. Display Chat
+# ------------------ DISPLAY CHAT ------------------ #
 for m in st.session_state.history:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
 
-# 5. Intro
+# ------------------ INTRO ------------------ #
 if not st.session_state.history:
-    intro = "Hello! I'm your Entertainment Assistant. What are we looking for? (e.g., 'Horror games for 2 hours' or 'Movies')"
+    intro = "Hello! I'm your Entertainment Assistant. What are we looking for?"
     st.session_state.history.append({"role": "assistant", "content": intro})
     st.rerun()
 
-# 6. The "Brain" (Multi-Agent Logic)
+# ------------------ USER INPUT ------------------ #
 if prompt := st.chat_input("Ask me anything..."):
     st.session_state.history.append({"role": "user", "content": prompt})
-
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Limit history (better performance)
-    recent_history = st.session_state.history[-6:]
-    context_str = "\n".join([f"{m['role']}: {m['content']}" for m in recent_history])
-
+    # ------------------ AI RESPONSE ------------------ #
     with st.chat_message("assistant"):
-        with st.spinner("🔍 Searching and verifying links..."):
+        with st.spinner("🔍 Finding best content for you..."):
             try:
                 scout, logistics, planner = get_crew_agents()
 
-                # =============================
-                # Task 1: Discovery
-                # =============================
+                # --- TASK 1: Discovery ---
                 t1 = Task(
                     description=(
-                        f"CONTEXT:\n{context_str}\n\n"
                         f"USER REQUEST: {prompt}\n\n"
-                        "Find 3-5 best options.\n"
-                        "- Understand user intent (mood, time, platform)\n"
-                        "- Include WHY it fits\n"
-                        "- If location-based → include city relevance"
+                        "Find 3 BEST recommendations based on the user's request."
                     ),
-                    expected_output="Structured recommendations with reasons",
+                    expected_output="Short list of 3 items",
                     agent=scout
                 )
 
-                # =============================
-                # Task 2: Links
-                # =============================
+                # --- TASK 2: Sourcing ---
                 t2 = Task(
-                    description="""
-                    Find DIRECT working links:
-                    - BookMyShow for movies
-                    - Netflix / Prime / YouTube links
-                    - No homepages
-                    """,
-                    expected_output="Clean deep links only",
+                    description="Get 3 valid direct links for the recommendations found.",
+                    expected_output="3 valid URLs",
                     agent=logistics,
                     context=[t1]
                 )
 
-                # =============================
-                # Task 3: JSON Output
-                # =============================
+                # --- TASK 3: Planning ---
                 t3 = Task(
-                    description="""
-                    Convert everything into STRICT JSON.
-
-                    Format:
-                    {
-                        "recommendations": [
-                            {
-                                "title": "",
-                                "description": "",
-                                "why": ""
-                            }
-                        ],
-                        "links": [
-                            {
-                                "title": "",
-                                "url": ""
-                            }
-                        ],
-                        "schedule": [
-                            {
-                                "time": "",
-                                "activity": ""
-                            }
-                        ]
-                    }
-
-                    Rules:
-                    - No extra text
-                    - No explanation
-                    - Only valid JSON
-                    """,
-                    expected_output="Valid JSON only",
+                    description=(
+                        "Synthesize the recommendations and links into a detailed, "
+                        "chronological timeline. Ensure every activity is assigned a "
+                        "specific time slot. Use the PlanOutput structure."
+                    ),
+                    expected_output="A structured plan with timeline, recommendations, and links.",
                     agent=planner,
-                    context=[t1, t2]
+                    context=[t1, t2],
+                    output_json=PlanOutput 
                 )
 
+                # ------------------ CREW ------------------ #
                 crew = Crew(
                     agents=[scout, logistics, planner],
                     tasks=[t1, t2, t3],
@@ -129,59 +112,67 @@ if prompt := st.chat_input("Ask me anything..."):
 
                 result = crew.kickoff()
 
-                # =============================
-                # JSON Parsing
-                # =============================
-                import json
-
+                # ------------------ BULLETPROOF DATA EXTRACTION ------------------ #
+                data = None
                 try:
-                    data = json.loads(str(result))
+                    # 1. Try Pydantic object first
+                    data = result.pydantic.model_dump()
                 except Exception:
-                    st.warning("⚠️ Could not parse structured data. Showing raw output.")
-                    st.markdown(str(result))
-                    st.session_state.history.append({
-                        "role": "assistant",
-                        "content": str(result)
-                    })
-                    st.stop()
+                    try:
+                        # 2. Try standard JSON parsing
+                        clean = str(result).strip()
+                        if "```json" in clean:
+                            clean = clean.split("```json")[-1].split("```")[0]
+                        data = json.loads(clean)
+                    except Exception:
+                        try:
+                            # 3. Handle Python-style output (fix for image_2b385d.png)
+                            data = ast.literal_eval(str(result).strip())
+                        except Exception as final_e:
+                            st.error("Failed to parse output format.")
+                            st.stop()
 
-                # =============================
-                # 🎬 UI: Recommendations
-                # =============================
-                st.markdown("## 🎬 Top Picks for You")
+                # ------------------ UI RENDERING ------------------ #
+                
+                # 1. TIMELINE SECTION
+                if data and data.get("timeline"):
+                    st.markdown("## 📅 Your Schedule")
+                    for slot in data["timeline"]:
+                        with st.container(border=True):
+                            col1, col2 = st.columns([1, 4])
+                            col1.markdown(f"**{slot.get('time')}**")
+                            col2.markdown(f"**{slot.get('event')}**")
+                            if slot.get('details'):
+                                col2.caption(slot.get('details'))
 
+                # 2. RECOMMENDATIONS SECTION
+                st.markdown("## 🎬 Top Picks")
                 for item in data.get("recommendations", []):
                     with st.container(border=True):
                         st.subheader(item.get("title", ""))
                         st.write(item.get("description", ""))
                         st.caption(f"✨ {item.get('why', '')}")
 
-                # =============================
-                # 🔗 UI: Links
-                # =============================
+                # 3. LINKS SECTION
                 if data.get("links"):
-                    st.markdown("## 🔗 Watch / Play")
+                    st.markdown("## 🔗 Resources & Links")
+                    links_list = data["links"]
+                    cols = st.columns(len(links_list))
+                    for idx, link in enumerate(links_list):
+                        with cols[idx]:
+                            st.link_button(
+                                link.get("title", "Visit"),
+                                link.get("url", "#"),
+                                use_container_width=True
+                            )
 
-                    for link in data["links"]:
-                        st.link_button(
-                            link.get("title", "Open"),
-                            link.get("url", "#")
-                        )
-
-                # =============================
-                # 📅 UI: Schedule
-                # =============================
-                if data.get("schedule"):
-                    st.markdown("## 📅 Your Plan")
-
-                    for s in data["schedule"]:
-                        st.write(f"**{s.get('time','')}** → {s.get('activity','')}")
-
-                # Save response
+                # Save to history
                 st.session_state.history.append({
                     "role": "assistant",
-                    "content": str(data)
+                    "content": "Plan generated successfully! See the details above."
                 })
 
             except Exception as e:
                 st.error(f"❌ Error: {e}")
+                with st.expander("Show Raw Error Output"):
+                    st.write(str(result) if 'result' in locals() else "No result generated")

@@ -1,20 +1,21 @@
-# Use official Python image
-FROM python:3.10-slim
+FROM python:3.12-slim
 
-# Set working directory
 WORKDIR /app
 
-# Copy files
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Increased timeout to handle large downloads
+RUN pip install --no-cache-dir --default-timeout=100 -r requirements.txt
 
-# Copy all project files
 COPY . .
 
-# Expose port (change if needed)
 EXPOSE 5000
 
-# Run your app
-CMD ["streamlit", "run", "app.py", "--server.port=5000", "--server.address=0.0.0.0"]
+HEALTHCHECK CMD curl --fail http://localhost:5000/_stcore/health
+
+ENTRYPOINT ["streamlit", "run", "app.py", "--server.port=5000", "--server.address=0.0.0.0"]
