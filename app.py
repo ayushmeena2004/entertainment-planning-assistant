@@ -96,7 +96,7 @@ if prompt := st.chat_input("Ask me anything..."):
                         "chronological timeline. Ensure every activity is assigned a "
                         "specific time slot. Use the PlanOutput structure."
                     ),
-                    expected_output="A structured plan with timeline, recommendations, and links.",
+                    expected_output="A structured plan with timeline, recommendations and descriptions",
                     agent=planner,
                     context=[t1, t2],
                     output_json=PlanOutput 
