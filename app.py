@@ -11,25 +11,30 @@ from typing import List
 # ------------------ SETUP ------------------ #
 load_dotenv()
 
+
 # Define the structured output schema
 class TimelineItem(BaseModel):
     time: str
     event: str
     details: str
 
+
 class Recommendation(BaseModel):
     title: str
     description: str
     why: str
 
+
 class Link(BaseModel):
     title: str
     url: str
+
 
 class PlanOutput(BaseModel):
     timeline: List[TimelineItem]
     recommendations: List[Recommendation]
     links: List[Link]
+
 
 st.set_page_config(page_title="Entertainment AI", page_icon="🎬", layout="wide")
 
@@ -55,7 +60,9 @@ for m in st.session_state.history:
 
 # ------------------ INTRO ------------------ #
 if not st.session_state.history:
-    intro = "Hello! I'm your Entertainment Assistant. What are we looking for?"
+    intro = (
+        "Hello! I'm your personalised Entertainment Assistant. What are we looking for?"
+    )
     st.session_state.history.append({"role": "assistant", "content": intro})
     st.rerun()
 
@@ -78,7 +85,7 @@ if prompt := st.chat_input("Ask me anything..."):
                         "Find 3 BEST recommendations based on the user's request."
                     ),
                     expected_output="Short list of 3 items",
-                    agent=scout
+                    agent=scout,
                 )
 
                 # --- TASK 2: Sourcing ---
@@ -86,7 +93,7 @@ if prompt := st.chat_input("Ask me anything..."):
                     description="Get 3 valid direct links for the recommendations found.",
                     expected_output="3 valid URLs",
                     agent=logistics,
-                    context=[t1]
+                    context=[t1],
                 )
 
                 # --- TASK 3: Planning ---
@@ -99,7 +106,7 @@ if prompt := st.chat_input("Ask me anything..."):
                     expected_output="A structured plan with timeline, recommendations and descriptions",
                     agent=planner,
                     context=[t1, t2],
-                    output_json=PlanOutput 
+                    output_json=PlanOutput,
                 )
 
                 # ------------------ CREW ------------------ #
@@ -107,7 +114,7 @@ if prompt := st.chat_input("Ask me anything..."):
                     agents=[scout, logistics, planner],
                     tasks=[t1, t2, t3],
                     process=Process.sequential,
-                    verbose=False
+                    verbose=False,
                 )
 
                 result = crew.kickoff()
@@ -133,7 +140,7 @@ if prompt := st.chat_input("Ask me anything..."):
                             st.stop()
 
                 # ------------------ UI RENDERING ------------------ #
-                
+
                 # 1. TIMELINE SECTION
                 if data and data.get("timeline"):
                     st.markdown("## 📅 Your Schedule")
@@ -142,8 +149,8 @@ if prompt := st.chat_input("Ask me anything..."):
                             col1, col2 = st.columns([1, 4])
                             col1.markdown(f"**{slot.get('time')}**")
                             col2.markdown(f"**{slot.get('event')}**")
-                            if slot.get('details'):
-                                col2.caption(slot.get('details'))
+                            if slot.get("details"):
+                                col2.caption(slot.get("details"))
 
                 # 2. RECOMMENDATIONS SECTION
                 st.markdown("## 🎬 Top Picks")
@@ -163,16 +170,20 @@ if prompt := st.chat_input("Ask me anything..."):
                             st.link_button(
                                 link.get("title", "Visit"),
                                 link.get("url", "#"),
-                                use_container_width=True
+                                use_container_width=True,
                             )
 
                 # Save to history
-                st.session_state.history.append({
-                    "role": "assistant",
-                    "content": "Plan generated successfully! See the details above."
-                })
+                st.session_state.history.append(
+                    {
+                        "role": "assistant",
+                        "content": "Plan generated successfully! See the details above.",
+                    }
+                )
 
             except Exception as e:
                 st.error(f"❌ Error: {e}")
                 with st.expander("Show Raw Error Output"):
-                    st.write(str(result) if 'result' in locals() else "No result generated")
+                    st.write(
+                        str(result) if "result" in locals() else "No result generated"
+                    )
